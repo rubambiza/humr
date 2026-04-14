@@ -55,4 +55,4 @@ packages/controller/
 - `go vet ./...` — clean
 - `go build -o dist/controller .` — compiles
 - `mise run helm:check:lint` + `mise run helm:check:render` — pass
-- Manual: `mise run cluster:upgrade`, create template + instance ConfigMaps, verify StatefulSet appears
+- Manual: `mise run cluster:install`, create template + instance ConfigMaps, verify StatefulSet appears

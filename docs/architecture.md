@@ -231,8 +231,7 @@ Wake (manual):
 Full cluster lifecycle via mise:
 
 ```sh
-mise run cluster:install    # create humr-k3s VM (lima), install cert-manager + ADK chart
-mise run cluster:upgrade    # helm upgrade with latest chart changes
+mise run cluster:install    # create humr-k3s VM (lima), install cert-manager + ADK chart (or upgrade if already installed)
 mise run cluster:status     # show pods and cluster state
 mise run cluster:logs       # show OneCLI pod logs
 mise run cluster:uninstall  # helm uninstall (keeps PVCs)
@@ -332,8 +331,7 @@ Each package (`packages/ui/tasks.toml`, `packages/controller/tasks.toml`, `deplo
 Defined in `deploy/tasks.toml`:
 
 ```sh
-mise run cluster:install    # create humr-k3s VM (lima), install cert-manager + ADK chart
-mise run cluster:upgrade    # helm upgrade
+mise run cluster:install    # create humr-k3s VM (lima), install cert-manager + ADK chart (or upgrade)
 mise run cluster:status     # show pods and cluster state
 mise run cluster:logs       # show OneCLI pod logs
 mise run cluster:uninstall  # helm uninstall (keeps PVCs)

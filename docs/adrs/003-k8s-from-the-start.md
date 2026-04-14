@@ -14,7 +14,7 @@ The original plan was Docker for the prototype and Kubernetes for production. In
 
 Kubernetes from the start, with k3s (via lima) for local development. No Docker-compose prototype phase.
 
-- **Local dev:** k3s VM managed by lima, full cluster lifecycle automated via mise (`mise run cluster:install`, `cluster:upgrade`, `cluster:delete`). Developers get a real K8s environment on their laptop with minimal setup.
+- **Local dev:** k3s VM managed by lima, full cluster lifecycle automated via mise (`mise run cluster:install`, `cluster:delete`). Developers get a real K8s environment on their laptop with minimal setup.
 - **Production:** Same Helm chart, same resource model, same controller. The gap between local and production is cluster configuration, not architecture.
 
 The architecture is the same everywhere: ConfigMaps as the resource model (ADR-006), StatefulSets for agent pods, PVCs for persistence, NetworkPolicies for isolation.

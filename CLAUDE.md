@@ -32,7 +32,7 @@ mise run ui:run             # start UI dev server
 ### Cluster lifecycle (k3s via lima)
 
 ```sh
-mise run cluster:install      # create k3s VM, build images, install cert-manager + Humr chart
+mise run cluster:install      # create k3s VM, build images, install cert-manager + Humr chart (or upgrade if already installed)
 mise run cluster:build-agent  # rebuild agent image only, restart agent pods
 mise run cluster:status       # show pods and cluster state
 mise run cluster:logs         # show OneCLI pod logs
