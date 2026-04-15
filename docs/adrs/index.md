@@ -24,11 +24,10 @@ This directory contains ADRs for the Humr project.
 | [016](016-messenger-integration.md) | Messenger integration handled by API Server | @tomkis |
 | [017](017-db-backed-sessions.md) | DB-backed ACP sessions for metadata | @tomkis |
 | [018](018-slack-integration.md) | Slack integration — Socket Mode, channel-based routing, identity linking | @tomkis |
+| [019](019-session-identity.md) | Scheduled and heartbeat session identity and lifecycle | @janjeliga |
 
 ## Drafts
 
 | Draft | Title | Owner |
 |-------|-------|-------|
 | [DRAFT](DRAFT-skills-harness-native.md) | Skills — harness-native, not platform-managed | @pilartomas |
-
-| [DRAFT](DRAFT-session-identity.md) | Scheduled and heartbeat session identity and lifecycle | @janjeliga |
