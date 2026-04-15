@@ -170,7 +170,7 @@ export function SchedulesPanel({ onResumeSession }: { onResumeSession?: (sid: st
                       {session.title || session.sessionId.slice(0, 12)}
                     </span>
                     <span className="text-[10px] text-text-muted shrink-0">
-                      {new Date(session.updatedAt ?? session.createdAt).toLocaleString()}
+                      created at: {new Date(session.updatedAt ?? session.createdAt).toLocaleString()}
                     </span>
                   </div>
                 ))}
@@ -182,7 +182,6 @@ export function SchedulesPanel({ onResumeSession }: { onResumeSession?: (sid: st
                         e.stopPropagation();
                         if (await showConfirm(`Reset session for "${s.name}"? The next tick will start a fresh conversation.`, "Reset Session")) {
                           await resetScheduleSession(s.id);
-                          setScheduleSessions(prev => ({ ...prev, [s.id]: [] }));
                         }
                       }}
                     >
