@@ -47,6 +47,7 @@ func BuildStatefulSet(name string, instance *types.InstanceSpec, agentSpec *type
 		{Name: "GIT_HTTP_PROXY_AUTHMETHOD", Value: "basic"},
 		{Name: "GH_TOKEN", Value: "humr:sentinel"},
 		{Name: "ADK_INSTANCE_ID", Value: name},
+		{Name: "API_SERVER_URL", Value: cfg.APIServerURL()},
 		{Name: "HOME", Value: "/home/agent"},
 	}
 	for _, e := range agentSpec.Env {
@@ -239,6 +240,7 @@ func BuildNetworkPolicy(name string, cfg *config.Config, ownerCM *corev1.ConfigM
 	acpPort := intstr.FromInt32(8080)
 	gwPort := intstr.FromInt32(int32(cfg.GatewayPort))
 	webPort := intstr.FromInt32(int32(cfg.WebPort))
+	apiServerPort := intstr.FromInt32(4000)
 	dnsPort := intstr.FromInt32(53)
 	dnsTargetPort := intstr.FromInt32(5353)
 
@@ -274,6 +276,21 @@ func BuildNetworkPolicy(name string, cfg *config.Config, ownerCM *corev1.ConfigM
 					Ports: []networkingv1.NetworkPolicyPort{
 						{Protocol: &tcp, Port: &gwPort},
 						{Protocol: &tcp, Port: &webPort},
+					},
+				},
+				{
+					// API Server (cross-namespace: runs in the release namespace)
+					// Agent-runtime calls internal session endpoints for schedule session persistence
+					To: []networkingv1.NetworkPolicyPeer{{
+						PodSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"app.kubernetes.io/component": "apiserver"},
+						},
+						NamespaceSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"kubernetes.io/metadata.name": cfg.ReleaseNamespace},
+						},
+					}},
+					Ports: []networkingv1.NetworkPolicyPort{
+						{Protocol: &tcp, Port: &apiServerPort},
 					},
 				},
 				{

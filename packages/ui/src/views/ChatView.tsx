@@ -622,7 +622,7 @@ export function ChatView() {
         <div className="flex flex-1 flex-col overflow-hidden">
           {rightTab === "files" && <FilesPanel onOpenFile={openFileHandler} />}
           {rightTab === "log" && <LogPanel />}
-          {rightTab === "schedules" && <SchedulesPanel />}
+          {rightTab === "schedules" && <SchedulesPanel onResumeSession={resumeSession} />}
           {rightTab === "channels" && <ChannelsPanel />}
           {rightTab === "mcps" && (
             <McpsPanel

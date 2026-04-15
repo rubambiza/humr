@@ -74,12 +74,13 @@ type InstanceStatus struct {
 // --- Schedule ---
 
 type ScheduleSpec struct {
-	Version    string                      `yaml:"version"`
-	Type       string                      `yaml:"type"`
-	Cron       string                      `yaml:"cron"`
-	Task       string                      `yaml:"task,omitempty"`
-	Enabled    bool                        `yaml:"enabled"`
-	MCPServers map[string]MCPServerConfig  `yaml:"mcpServers,omitempty"`
+	Version      string                     `yaml:"version"`
+	Type         string                     `yaml:"type"`
+	Cron         string                     `yaml:"cron"`
+	Task         string                     `yaml:"task,omitempty"`
+	Enabled      bool                       `yaml:"enabled"`
+	MCPServers   map[string]MCPServerConfig `yaml:"mcpServers,omitempty"`
+	SessionMode  string                     `yaml:"sessionMode,omitempty"`
 }
 
 type ScheduleStatus struct {

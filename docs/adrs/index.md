@@ -31,3 +31,4 @@ This directory contains ADRs for the Humr project.
 |-------|-------|-------|
 | [DRAFT](DRAFT-skills-harness-native.md) | Skills — harness-native, not platform-managed | @pilartomas |
 
+| [DRAFT](DRAFT-session-identity.md) | Scheduled and heartbeat session identity and lifecycle | @janjeliga |

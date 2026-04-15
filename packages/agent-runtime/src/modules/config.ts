@@ -8,6 +8,7 @@ const schema = z.object({
     .transform((v) => v === "true"),
   WORKSPACE_DIR: z.string().default("/workspace"),
   TRIGGERS_DIR: z.string().default("/workspace/.triggers"),
+  API_SERVER_URL: z.string().default(""),
 });
 
 export const config = schema.parse(process.env);

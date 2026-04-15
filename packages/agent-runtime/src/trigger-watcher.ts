@@ -1,12 +1,20 @@
 import { watch, mkdirSync, readdirSync, readFileSync, unlinkSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import { Agent, request } from "node:http";
+import { Agent as HttpsAgent, request as requestHttps } from "node:https";
+
+// Explicit agents bypass HTTP_PROXY env vars (agent pods route external
+// traffic through OneCLI, but internal cluster calls must go direct).
+const directAgent = new Agent();
+const directHttpsAgent = new HttpsAgent();
 import { z } from "zod/v4";
-import { spawnAcpSession } from "./acp-bridge.js";
 
 const TriggerFile = z.object({
   schedule: z.string(),
   timestamp: z.string(),
   task: z.string(),
+  type: z.enum(["heartbeat", "cron"]).optional(),
+  sessionMode: z.enum(["continuous", "fresh"]).optional(),
   params: z.record(z.string(), z.unknown()).optional(),
   mcpServers: z.array(z.unknown()).default([]),
 });
@@ -15,153 +23,134 @@ type TriggerPayload = z.infer<typeof TriggerFile>;
 
 interface TriggerWatcherOptions {
   triggersDir: string;
-  workingDir: string;
-  agentScript: string;
-  isDev: boolean;
+  apiServerUrl: string;
+  instanceId: string;
 }
 
 export interface TriggerWatcher {
-  /** Number of triggers currently being processed. */
   activeCount(): number;
 }
 
 export function startTriggerWatcher(options: TriggerWatcherOptions): TriggerWatcher {
   const { triggersDir } = options;
-  const inflight = new Set<string>();
+  const inflightSchedules = new Set<string>();
+  const processingFiles = new Set<string>();
 
   mkdirSync(triggersDir, { recursive: true });
 
-  // Process any trigger files already present on startup
-  for (const file of readdirSync(triggersDir)) {
-    if (file.endsWith(".json")) {
-      processTriggerFile(join(triggersDir, file), options);
-    }
-  }
-
-  // Watch for new trigger files
-  watch(triggersDir, (_event, filename) => {
-    if (!filename?.endsWith(".json")) return;
-    if (inflight.has(filename)) return;
-    inflight.add(filename);
-    const filePath = join(triggersDir, filename);
-    processTriggerFile(filePath, options).finally(() => inflight.delete(filename));
-  });
-
-  process.stderr.write(`[trigger] Watching ${triggersDir}\n`);
-
-  return { activeCount: () => inflight.size };
-}
-
-async function processTriggerFile(filePath: string, options: TriggerWatcherOptions): Promise<void> {
-  if (!existsSync(filePath)) return;
-
-  let raw: string;
-  try {
-    raw = readFileSync(filePath, "utf8");
-  } catch {
-    return; // File may have been picked up by another event
-  }
-
-  // Delete immediately to avoid re-pickup
-  try {
-    unlinkSync(filePath);
-  } catch {}
-
-  let trigger: TriggerPayload;
-  try {
-    trigger = TriggerFile.parse(JSON.parse(raw));
-  } catch (err) {
-    process.stderr.write(`[trigger] Invalid trigger file ${filePath}: ${err}\n`);
-    return;
-  }
-
-  process.stderr.write(`[trigger] Picked up: ${trigger.schedule} (${trigger.timestamp})\n`);
-  try {
-    await runTriggerSession(trigger, options);
-  } catch (err) {
-    process.stderr.write(`[trigger] Session error: ${err}\n`);
-  }
-}
-
-async function runTriggerSession(trigger: TriggerPayload, options: TriggerWatcherOptions): Promise<void> {
-  const session = spawnAcpSession({
-    agentScript: options.agentScript,
-    workingDir: options.workingDir,
-    isDev: options.isDev,
-  });
-
-  let requestId = 0;
-  const nextId = () => ++requestId;
-  const pending = new Map<number, { resolve: (v: any) => void; reject: (e: Error) => void }>();
-
-  session.onMessage((line) => {
-    let msg: any;
+  function scanAndProcess() {
+    let files: string[];
     try {
-      msg = JSON.parse(line);
+      files = readdirSync(triggersDir).filter((f) => f.endsWith(".json"));
     } catch {
       return;
     }
 
-    // Response to our request
-    if (msg.id !== undefined && pending.has(msg.id)) {
-      const { resolve, reject } = pending.get(msg.id)!;
-      pending.delete(msg.id);
-      if (msg.error) {
-        reject(new Error(msg.error.message ?? JSON.stringify(msg.error)));
-      } else {
-        resolve(msg.result);
-      }
-      return;
-    }
+    for (const file of files) {
+      if (processingFiles.has(file)) continue;
 
-    // Agent requesting permission — auto-approve (without this the agent blocks)
-    if (msg.method === "session/request_permission" && msg.id !== undefined) {
-      session.send({ jsonrpc: "2.0", id: msg.id, result: { outcome: "approved" } });
-      return;
-    }
+      const filePath = join(triggersDir, file);
+      const trigger = peekTrigger(filePath);
+      if (!trigger) continue;
 
-    // Any other agent-to-client request — acknowledge so the agent doesn't hang
-    if (msg.method !== undefined && msg.id !== undefined) {
-      process.stderr.write(`[trigger] Unhandled agent request: ${msg.method}\n`);
-      session.send({ jsonrpc: "2.0", id: msg.id, result: {} });
-      return;
-    }
-  });
+      // Per-schedule serialization: skip if this schedule is already running
+      if (inflightSchedules.has(trigger.schedule)) continue;
 
-  session.exited.then(() => {
-    for (const [, { reject }] of pending) {
-      reject(new Error("Agent process exited"));
-    }
-    pending.clear();
-  });
+      processingFiles.add(file);
+      inflightSchedules.add(trigger.schedule);
 
-  function rpcRequest(method: string, params: object): Promise<any> {
-    return new Promise((resolve, reject) => {
-      const id = nextId();
-      pending.set(id, { resolve, reject });
-      session.send({ jsonrpc: "2.0", id, method, params });
-    });
+      processTrigger(trigger, filePath, options)
+        .finally(() => {
+          processingFiles.delete(file);
+          inflightSchedules.delete(trigger.schedule);
+          scanAndProcess();
+        });
+    }
   }
+
+  scanAndProcess();
+  watch(triggersDir, () => scanAndProcess());
+
+  process.stderr.write(`[trigger] Watching ${triggersDir}\n`);
+
+  return { activeCount: () => processingFiles.size };
+}
+
+function peekTrigger(filePath: string): TriggerPayload | null {
+  if (!existsSync(filePath)) return null;
+  try {
+    const raw = readFileSync(filePath, "utf8");
+    return TriggerFile.parse(JSON.parse(raw));
+  } catch (err) {
+    process.stderr.write(`[trigger] Invalid trigger file ${filePath}: ${err}\n`);
+    try { unlinkSync(filePath); } catch {}
+    return null;
+  }
+}
+
+async function processTrigger(
+  trigger: TriggerPayload,
+  filePath: string,
+  options: TriggerWatcherOptions,
+): Promise<void> {
+  process.stderr.write(`[trigger] Processing: ${trigger.schedule} (${trigger.timestamp})\n`);
 
   try {
-    await rpcRequest("initialize", {
-      clientCapabilities: {},
-      clientInfo: { name: "humr-trigger", version: "1.0.0" },
-      protocolVersion: 1,
-    });
-
-    const { sessionId } = await rpcRequest("session/new", {
-      cwd: options.workingDir,
+    if (!options.apiServerUrl) {
+      process.stderr.write(`[trigger] API_SERVER_URL not set, skipping ${trigger.schedule}\n`);
+      return;
+    }
+    const result = await postTrigger(options.apiServerUrl, {
+      instanceId: options.instanceId,
+      schedule: trigger.schedule,
+      task: trigger.task,
+      type: trigger.type,
+      sessionMode: trigger.sessionMode,
       mcpServers: trigger.mcpServers,
     });
+    process.stderr.write(`[trigger] Completed: ${trigger.schedule} session=${result.sessionId} stopReason=${result.stopReason ?? "done"}\n`);
+  } catch (err) {
+    process.stderr.write(`[trigger] Session error for ${trigger.schedule}: ${err}\n`);
+  } finally {
+    try { unlinkSync(filePath); } catch {}
+  }
+}
 
-    const result = await rpcRequest("session/prompt", {
-      sessionId,
-      prompt: [{ type: "text", text: trigger.task }],
+/** POST to the API server's /internal/trigger endpoint using node:http (bypasses HTTP_PROXY). */
+function postTrigger(
+  apiServerUrl: string,
+  body: object,
+): Promise<{ sessionId: string; stopReason?: string }> {
+  return new Promise((resolve, reject) => {
+    const url = new URL("/internal/trigger", apiServerUrl);
+    const payload = JSON.stringify(body);
+    const doRequest = url.protocol === "https:" ? requestHttps : request;
+
+    const req = doRequest(url, {
+      method: "POST",
+      agent: url.protocol === "https:" ? directHttpsAgent : directAgent,
+      headers: {
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(payload),
+      },
+    }, (res) => {
+      let data = "";
+      res.on("data", (chunk) => { data += chunk; });
+      res.on("end", () => {
+        if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+          try {
+            resolve(JSON.parse(data));
+          } catch {
+            reject(new Error(`Invalid JSON response: ${data}`));
+          }
+        } else {
+          reject(new Error(`POST /internal/trigger failed: ${res.statusCode} ${data}`));
+        }
+      });
     });
 
-    process.stderr.write(`[trigger] Session ${sessionId} completed: ${result.stopReason ?? "done"}\n`);
-  } finally {
-    session.kill();
-  }
+    req.on("error", reject);
+    req.write(payload);
+    req.end();
+  });
 }

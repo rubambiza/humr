@@ -26,15 +26,29 @@
     {
       "idx": 3,
       "version": "7",
-      "when": 1776239075498,
-      "tag": "0003_identity_links",
+      "when": 1776174356309,
+      "tag": "0003_broad_songbird",
       "breakpoints": true
     },
     {
       "idx": 4,
       "version": "7",
+      "when": 1776178800000,
+      "tag": "0004_schedule_active",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1776239075498,
+      "tag": "0005_identity_links",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
       "when": 1776412800000,
-      "tag": "0004_allowed_users",
+      "tag": "0006_allowed_users",
       "breakpoints": true
     }
   ]

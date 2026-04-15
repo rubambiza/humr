@@ -136,6 +136,9 @@ func (s *Scheduler) fire(ctx context.Context, instanceName, scheduleName string,
 	if len(spec.MCPServers) > 0 {
 		trigger["mcpServers"] = spec.MCPServers
 	}
+	if spec.SessionMode != "" {
+		trigger["sessionMode"] = spec.SessionMode
+	}
 	triggerJSON, _ := json.Marshal(trigger)
 	filename := fmt.Sprintf("/workspace/.triggers/%d.json", time.Now().UnixMilli())
 	tmpFilename := filename + ".tmp"

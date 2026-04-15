@@ -4,6 +4,7 @@ export interface ScheduleSpec {
   cron: string;
   task?: string;
   enabled: boolean;
+  sessionMode?: "continuous" | "fresh";
 }
 
 export interface ScheduleStatus {
@@ -25,6 +26,7 @@ export interface CreateCronScheduleInput {
   instanceId: string;
   cron: string;
   task: string;
+  sessionMode?: "continuous" | "fresh";
 }
 
 export interface CreateHeartbeatScheduleInput {

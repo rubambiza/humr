@@ -9,6 +9,7 @@ import {
 } from "./modules/agents/infrastructure/k8s.js";
 import { createInstancesRepository } from "./modules/agents/infrastructure/InstancesRepository.js";
 import { composeAgentsModule, composeSystemInstances, startK8sCleanupSaga, startChannelCleanupSaga } from "./modules/agents/index.js";
+import { createAcpClient } from "./acp-client.js";
 import { deleteChannelsByInstance } from "./modules/agents/infrastructure/channels-repository.js";
 import { upsertSession } from "./modules/agents/infrastructure/sessions-repository.js";
 import { createSlackWorker, type SlackOAuthPending } from "./modules/channels/infrastructure/slack.js";
@@ -98,6 +99,48 @@ app.get("/api/auth/config", (c) =>
     onecliUrl: config.onecliExternalUrl,
   }),
 );
+
+// --- Internal endpoints (no JWT auth — secured by K8s NetworkPolicy) ---
+// Called by agent-runtime trigger-watcher to execute scheduled sessions.
+// Session lookup, creation, persistence, and ACP relay all happen here.
+app.post("/internal/trigger", async (c) => {
+  const body = await c.req.json<{
+    instanceId: string;
+    schedule: string;
+    task: string;
+    type?: "heartbeat" | "cron";
+    sessionMode?: "continuous" | "fresh";
+    mcpServers?: unknown[];
+  }>();
+  if (!body.instanceId || !body.schedule || !body.task) {
+    return c.json({ error: "instanceId, schedule, task required" }, 400);
+  }
+
+  const mode = body.sessionMode ?? (body.type === "heartbeat" ? "continuous" : "fresh");
+  const sessionType = body.type === "heartbeat" ? "schedule_heartbeat" : "schedule_cron";
+  const { sessions } = composeAgentsModule(api, config.namespace, "_system", db);
+
+  // For continuous mode, look up existing session
+  let resumeSessionId: string | undefined;
+  if (mode === "continuous") {
+    const found = await sessions.findByScheduleId(body.schedule);
+    resumeSessionId = found?.sessionId;
+  }
+
+  const acp = createAcpClient({
+    namespace: config.namespace,
+    instanceName: body.instanceId,
+    onSessionCreated: (sid: string) => sessions.create(sid, body.instanceId, sessionType as any, body.schedule),
+  });
+
+  const result = await acp.triggerSession({
+    prompt: body.task,
+    resumeSessionId,
+    mcpServers: body.mcpServers,
+  });
+
+  return c.json(result);
+});
 
 app.use("/api/*", auth.middleware);
 

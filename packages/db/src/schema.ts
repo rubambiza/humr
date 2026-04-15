@@ -1,4 +1,4 @@
-import { pgTable, text, jsonb, uniqueIndex, primaryKey, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, jsonb, uniqueIndex, primaryKey, timestamp, boolean } from "drizzle-orm/pg-core";
 
 export const channels = pgTable("channels", {
   instanceId: text("instance_id").notNull(),
@@ -28,5 +28,7 @@ export const sessions = pgTable("sessions", {
   sessionId: text("session_id").primaryKey(),
   instanceId: text("instance_id").notNull(),
   type: text("type").notNull().default("regular"),
+  scheduleId: text("schedule_id"),
+  scheduleActive: boolean("schedule_active").default(true).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });

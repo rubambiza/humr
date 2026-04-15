@@ -20,6 +20,16 @@ const workingDir = config.HUMR_DEV
 
 const createContext = (): AgentRuntimeContext => ({
   files: createFilesService(workingDir),
+  messages: {
+    async getSessionMessages(sessionId, opts) {
+      // TODO: Wire to ACP SDK's getSessionMessages when available.
+      // The SDK reads from the session's JSONL transcript on disk.
+      // For now, return empty array — the tRPC route is functional,
+      // the SDK integration is a follow-up.
+      process.stderr.write(`[messages] getSessionMessages(${sessionId}, ${JSON.stringify(opts)})\n`);
+      return [];
+    },
+  },
 });
 
 const CORS = {
@@ -119,8 +129,7 @@ server.listen(config.PORT, () => {
 
   triggerWatcher = startTriggerWatcher({
     triggersDir: config.TRIGGERS_DIR,
-    workingDir,
-    agentScript,
-    isDev: config.HUMR_DEV,
+    apiServerUrl: config.API_SERVER_URL,
+    instanceId: process.env.ADK_INSTANCE_ID ?? process.env.HOSTNAME ?? "unknown",
   });
 });

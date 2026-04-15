@@ -78,6 +78,7 @@ export interface Schedule {
   cron: string;
   task: string | null;
   enabled: boolean;
+  sessionMode?: "continuous" | "fresh";
   status: { lastRun?: string; nextRun?: string; lastResult?: string } | null;
 }
 

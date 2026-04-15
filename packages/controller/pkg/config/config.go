@@ -80,6 +80,12 @@ func (c *Config) WebURL() string {
 	return fmt.Sprintf("http://%s:%d", c.GatewayFQDN(), c.WebPort)
 }
 
+// APIServerURL returns the in-cluster HTTP URL for the Humr API server.
+// Used by agent-runtime to persist schedule sessions via internal endpoints.
+func (c *Config) APIServerURL() string {
+	return fmt.Sprintf("http://%s-apiserver.%s.svc.cluster.local:4000", c.ReleaseName, c.ReleaseNamespace)
+}
+
 func keycloakTokenURL() string {
 	if v := os.Getenv("KEYCLOAK_TOKEN_URL"); v != "" {
 		return v

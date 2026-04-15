@@ -21,7 +21,7 @@ export function createSchedulesService(deps: {
       const agentRef = await deps.repo.readAgentRef(input.instanceId, deps.owner);
       if (!agentRef) throw new Error(`Instance "${input.instanceId}" not found`);
 
-      const spec = {
+      const spec: Record<string, unknown> = {
         name: input.name,
         version: SPEC_VERSION,
         type: "cron" as const,
@@ -29,6 +29,7 @@ export function createSchedulesService(deps: {
         task: input.task,
         enabled: true,
       };
+      if (input.sessionMode) spec.sessionMode = input.sessionMode;
       return deps.repo.create(input.instanceId, agentRef, spec, deps.owner);
     },
 
