@@ -50,6 +50,13 @@
       "when": 1776412800000,
       "tag": "0006_allowed_users",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1776451200000,
+      "tag": "0007_backfill_schedule_columns",
+      "breakpoints": true
     }
   ]
 }
